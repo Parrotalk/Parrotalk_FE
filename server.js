@@ -70,7 +70,7 @@ wsServer.on('connection', socket => {
 
       // rooms 객체에 email과 socket.id 저장
       if (!rooms[roomName]) rooms[roomName] = [];
-      rooms[roomName].push({ id: socket.id, email });
+      rooms[roomName].push({ id: socket.id, email, screenType });
 
       // RoomManager에 방 추가 및 Transcribe 관련 설정
       if (!roomManager.isActive(roomName)) {
@@ -83,10 +83,17 @@ wsServer.on('connection', socket => {
       socket.to(roomName).emit('welcome');
       socket.to(roomName).emit('notification_hi', email);
 
-      // With Chat 모드일 경우 Transcribe 시작
-      if (screenType === 'chat') {
+      // With Chat 모드인 참여자가 있는지 확인
+      const chatUser = rooms[roomName].find(user => user.screenType === 'chat');
+      const voiceUser = rooms[roomName].find(
+        user => user.screenType === 'voice'
+      );
+
+      // 채팅 유저와 음성 유저가 모두 있을 때 Transcribe 시작
+      if (chatUser && voiceUser) {
         const audioStream = roomManager.addAudioStream(roomName);
         if (audioStream) {
+          console.log(`[Transcribe] Starting Transcribe for room: ${roomName}`);
           transcribeService.startTranscribe(roomName, wsServer);
         } else {
           console.error(
