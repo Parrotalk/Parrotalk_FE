@@ -34,6 +34,8 @@ package-lock.json
 
 # dotenv environment variables file
 .env
+.env.development
+.env.production
 .env.local
 .env.*.local
 
