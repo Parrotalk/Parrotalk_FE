@@ -1,6 +1,7 @@
 import React from 'react';
 import Header from '../components/common/Header';
 import './OnboardingScreen.css';
+import Login from './Login';
 
 const OnboardingScreen = () => {
   // 쿠키에서 refreshToken 체크
@@ -29,8 +30,7 @@ const OnboardingScreen = () => {
 
       {/* Login 컴포넌트 */}
       <div className="onboarding-login">
-        <h2>로그인</h2>
-        {/* Login 컴포넌트 자리 */}
+        <Login />
       </div>
     </div>
   );

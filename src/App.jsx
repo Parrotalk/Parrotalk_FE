@@ -6,9 +6,12 @@ import CallHomeScreen from './components/CallHomeScreen';
 import CallScreen from './components/CallScreen';
 import EndCallScreen from './components/EndCallScreen';
 import { SocketProvider } from './context/SocketContext';
+import { UserInfoProvider } from './context/UserInfoContext';
+
 
 const App = () => {
   return (
+    <UserInfoProvider>
     <SocketProvider>
       <Router>
         <MainLayout>
@@ -21,6 +24,7 @@ const App = () => {
         </MainLayout>
       </Router>
     </SocketProvider>
+    </UserInfoProvider>
   );
 };
 
