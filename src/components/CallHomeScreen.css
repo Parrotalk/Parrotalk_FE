@@ -1,11 +1,22 @@
+.call-home-view {
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* 아래로 정렬 */
+  min-height: 100vh; /* 화면 전체 높이 */
+  box-sizing: border-box; /* 패딩 포함 크기 계산 */
+  margin: 0;
+  padding: 0;
+}
+
 /* 큰 컨테이너 */
 .call-home-container {
   padding: 24px;
   background-color: #fff4d1;
   border-radius: 16px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  max-width: 480px;
-  margin: 32px auto;
+  max-width: 480px; /* 모바일 기준 */
+  padding: var(--spacing);
+  margin-bottom: 120px;
 }
 
 /* 프로필 섹션 */

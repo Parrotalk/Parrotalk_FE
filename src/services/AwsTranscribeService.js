@@ -9,6 +9,7 @@ import {
   chunkInterval,
   emptyChunkInterval,
 } from '../utils/constants.js';
+import { finished } from 'stream/promises';
 
 class AwsTranscribeService {
   constructor(region, accessKeyId, secretAccessKey, roomManager) {
@@ -141,36 +142,51 @@ class AwsTranscribeService {
       );
       return;
     }
+
     this.roomManager.setStopping(roomName);
 
-    const abortController = this.roomManager.getAbortController(roomName);
     const stream = this.roomManager.getAudioStream(roomName);
+    const abortController = this.roomManager.getAbortController(roomName);
 
-    if (abortController && stream && !stream.destroyed) {
-      console.log(`[Transcribe] Manual stop request for room: ${roomName}`);
-      this.roomManager.deactivateSession(roomName);
+    if (stream && !stream.destroyed && !stream.writableEnded) {
       try {
-        abortController.abort(); // AWS 작업 중단
-      } catch (error) {
-        console.warn(`[Transcribe] Error aborting: ${error.message}`);
-      }
+        console.log(
+          `[Transcribe] Sending final empty audio chunk for room: ${roomName}`
+        );
+        stream.write(Buffer.alloc(4096)); // 빈 청크 전송
+        stream.end();
 
-      console.log(
-        `[Transcribe] Waiting 250ms to ensure all chunks are processed...`
-      );
-      setTimeout(() => {
-        stream.end(() => {
-          console.log(
-            `[Transcribe] Audio stream fully ended for room: ${roomName}`
-          );
-          this.roomManager.removeRoom(roomName);
-          this.roomManager.clearStopping(roomName);
-        });
-      }, chunkInterval * 2);
-    } else {
-      console.warn(`[Transcribe] No active stream found for room: ${roomName}`);
-      this.roomManager.clearStopping(roomName);
+        // 일정 시간 지연 후 스트림 종료 확인
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await finished(stream);
+        console.log(
+          `[Transcribe] Audio stream fully closed for room: ${roomName}`
+        );
+      } catch (error) {
+        console.error(
+          `[Transcribe] Error during stream closure: ${error.message}`
+        );
+      }
     }
+
+    if (abortController) {
+      setImmediate(() => {
+        try {
+          console.log(
+            `[Transcribe] Aborting Transcribe session for room: ${roomName}`
+          );
+          abortController.abort();
+        } catch (error) {
+          console.warn(
+            `[Transcribe] Error aborting Transcribe: ${error.message}`
+          );
+        }
+      });
+    }
+
+    this.roomManager.removeRoom(roomName);
+    this.roomManager.clearStopping(roomName);
+    console.log(`[Transcribe] Stopped session for room: ${roomName}`);
   }
 }
 

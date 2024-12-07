@@ -10,15 +10,21 @@ class RoomManager {
   }
 
   isStopping(roomName) {
-    return this.transcribeStopping[roomName] === true;
+    return this.transcribeStopping[roomName] || false;
   }
 
   setStopping(roomName) {
-    this.transcribeStopping[roomName] = true;
+    if (!this.transcribeStopping[roomName]) {
+      console.log(`[RoomManager] Marking room ${roomName} as stopping.`);
+      this.transcribeStopping[roomName] = true;
+    }
   }
 
   clearStopping(roomName) {
-    delete this.transcribeStopping[roomName];
+    if (this.transcribeStopping[roomName]) {
+      console.log(`[RoomManager] Clearing stopping flag for room ${roomName}.`);
+      delete this.transcribeStopping[roomName];
+    }
   }
 
   addRoom(roomName) {
@@ -42,10 +48,20 @@ class RoomManager {
   }
 
   async removeRoom(roomName) {
+    if (this.isStopping(roomName)) {
+      console.log(
+        `[RoomManager] Cleanup already in progress for room: ${roomName}`
+      );
+      return;
+    }
+
+    console.log(`[RoomManager] Removing room: ${roomName}.`);
+    this.setStopping(roomName);
+
     if (this.roomAudioStreams[roomName]) {
       const audioStream = this.roomAudioStreams[roomName];
 
-      if (!audioStream.destroyed) {
+      if (audioStream && !audioStream.destroyed) {
         await new Promise(resolve => {
           audioStream.end(() => {
             console.log(`[RoomManager] Stream ended for room: ${roomName}`);
@@ -53,9 +69,12 @@ class RoomManager {
           });
         });
         audioStream.destroy();
+        console.log(
+          `[RoomManager] Audio stream destroyed for room: ${roomName}.`
+        );
       } else {
         console.warn(
-          `[RoomManager] Stream already destroyed for room: ${roomName}`
+          `[RoomManager] Audio stream already destroyed or not found for room:: ${roomName}`
         );
       }
 
@@ -63,10 +82,12 @@ class RoomManager {
     }
 
     if (this.abortControllers[roomName]) {
+      console.log(`[RoomManager] Aborting controller for room: ${roomName}.`);
       this.abortControllers[roomName].abort();
       delete this.abortControllers[roomName];
     }
 
+    this.clearStopping(roomName); // 종료 플래그 해제
     delete this.activeSessions[roomName];
     console.log(`[RoomManager] Room ${roomName} removed.`);
   }

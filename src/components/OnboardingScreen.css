@@ -2,12 +2,17 @@
   max-width: 480px; /* 모바일 기준 */
   margin: 0 auto;
   padding: var(--spacing);
-  background-color: var(--color-background-main);
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* 아래로 정렬 */
+  min-height: 100vh; /* 화면 전체 높이 */
+  box-sizing: border-box; /* 패딩 포함 크기 계산 */
 }
 
 .onboarding-image-container {
-  margin: 24px 0;
   text-align: center;
+  margin-top: 0;
+  margin-bottom: 35px;
 }
 
 .onboarding-image {
@@ -25,6 +30,5 @@
 }
 
 .onboarding-login {
-  margin-top: 32px;
   text-align: center;
 }

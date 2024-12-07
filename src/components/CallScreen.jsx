@@ -11,7 +11,6 @@ import CallVoiceScreen from './CallVoiceScreen';
 import { useUserInfo } from '../context/UserInfoContext';
 import { usePeer } from '../context/PeerContext';
 
-
 const CallScreen = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -27,8 +26,12 @@ const CallScreen = () => {
   const socket = useSocket();
 
   const { userInfo, setUserInfo } = useUserInfo();
-  const { peerNickname, setPeerNickname, peerProfileImage, setPeerProfileImage } = usePeer();
-
+  const {
+    peerNickname,
+    setPeerNickname,
+    peerProfileImage,
+    setPeerProfileImage,
+  } = usePeer();
 
   // TODO : 로그인 붙이면서 이거 고치기
   // const [email, setEmail] = useState(
@@ -37,26 +40,38 @@ const CallScreen = () => {
   const [talkId, setTalkId] = useState(null); // talkId 상태 추가
   const screenType = useRef(null);
   const [isSelectionLocked, setSelectionLocked] = useState(false);
+
+  const audioProcessorNode = useRef(null);
+  const audioContext = useRef(null);
+
   const [chatMessages, setChatMessages] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-
   useEffect(() => {
-    // 초기화 시 userInfo 설정
-    if (!userInfo.nickname || !userInfo.email) {
-      setUserInfo({
-        nickname: "익명",
-        email: "callee@parrotalk.com",
-        profileImage: DefaultProfile
-      });
+    const storedUserInfo = localStorage.getItem('userInfo');
+
+    if (storedUserInfo) {
+      setUserInfo(JSON.parse(storedUserInfo));
+    } else {
+      const defaultUserInfo = {
+        nickname: '익명',
+        email: 'callee@parrotalk.com',
+        profileImage: DefaultProfile,
+      };
+      setUserInfo(defaultUserInfo);
+      localStorage.setItem('userInfo', JSON.stringify(defaultUserInfo));
     }
-  }, [userInfo]);
+  }, [setUserInfo]);
+
+  const talkIdRef = useRef(null);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const extractedTalkId = queryParams.get('talkId');
-    setTalkId(extractedTalkId);
-    console.log('Extracted talkId:', extractedTalkId);
+    talkIdRef.current = extractedTalkId; // useRef에 저장
+    setTalkId(extractedTalkId); // 상태 업데이트
+  }, [location.search]);
 
+  useEffect(() => {
     const initialize = async () => {
       if (socket && socket.connected) {
         registerSocketEvents(socket);
@@ -71,7 +86,7 @@ const CallScreen = () => {
     initialize();
 
     return () => {};
-  }, [talkId]);
+  }, []);
 
   const cleanupSocketEvents = socket => {
     socket.off('disconnect', () => handleDisconnect(socket));
@@ -87,7 +102,7 @@ const CallScreen = () => {
     socket.off('transcript', handleTranscript);
     socket.off('stop_audio_chunk', handleStopAudioChunk);
     socket.off('recommendations', handleRecommendations);
-    socket.off("tts_response", handleTTS);
+    socket.off('tts_response', handleTTS);
   };
 
   const registerSocketEvents = socket => {
@@ -105,28 +120,29 @@ const CallScreen = () => {
     socket.on('transcript', handleTranscript);
     socket.on('stop_audio_chunk', handleStopAudioChunk);
     socket.on('recommendations', handleRecommendations);
-    socket.on("tts_response", handleTTS);
+    socket.on('tts_response', handleTTS);
     console.log('Socket events registered.');
   };
 
   const handleTTS = audioBase64 => {
-  
     // Base64 디코딩 후 ArrayBuffer로 변환 및 오디오 재생
     const playAudio = async () => {
       try {
         const audioData = atob(audioBase64['data']);
-        const arrayBuffer = new Uint8Array(audioData.length).map((_, i) => audioData.charCodeAt(i)).buffer;
-  
+        const arrayBuffer = new Uint8Array(audioData.length).map((_, i) =>
+          audioData.charCodeAt(i)
+        ).buffer;
+
         const audioContext = new window.AudioContext();
         const decodedData = await audioContext.decodeAudioData(arrayBuffer);
-  
+
         const source = audioContext.createBufferSource();
         source.buffer = decodedData;
-  
+
         // 오디오 재생
         source.connect(audioContext.destination);
         source.start(0);
-  
+
         // 재생 완료 후 리소스 정리
         source.onended = () => {
           source.disconnect();
@@ -137,11 +153,10 @@ const CallScreen = () => {
         console.error('Error playing TTS audio:', error);
       }
     };
-  
+
     // 오디오 재생 호출
     playAudio();
   };
-  
 
   const handleRecommendations = data => {
     console.log('Received recommendations:', data);
@@ -159,8 +174,8 @@ const CallScreen = () => {
   };
 
   const handleStartCall = async () => {
-    console.log(roomName)
-    console.log(userInfo.email)
+    console.log(roomName);
+    console.log(userInfo.email);
     console.log(socket);
     if (!roomName || !userInfo.email || !socket) {
       alert('오류가 발생해서 방 생성 페이지로 돌아갑니다.');
@@ -177,14 +192,13 @@ const CallScreen = () => {
       myStream.current = stream;
 
       // 마지막에 들어온 사람은 이전에 들어온 사람의 이메일을 알 수 없음
-      socket.on('another_user', (users) => {
-          console.log('Other users in room:', users);
-          users.forEach(user => {
-              setPeerNickname(user.nickname);
-              setPeerProfileImage(user.profileImage);
-          });
+      socket.on('another_user', users => {
+        console.log('Other users in room:', users);
+        users.forEach(user => {
+          setPeerNickname(user.nickname);
+          setPeerProfileImage(user.profileImage);
+        });
       });
-    
 
       if (myVideoRef.current) {
         console.log('myStream added.');
@@ -206,7 +220,14 @@ const CallScreen = () => {
       myDataChannel.current.onmessage = handleReceiveMessage;
       console.log('DataChannel created for chat');
 
-      socket.emit('join_room', roomName, userInfo.email, userInfo.nickname, userInfo.profileImage, screenType.current);
+      socket.emit(
+        'join_room',
+        roomName,
+        userInfo.email,
+        userInfo.nickname,
+        userInfo.profileImage,
+        screenType.current
+      );
     } catch (error) {
       console.error('Error during call setup:', error);
     }
@@ -256,7 +277,7 @@ const CallScreen = () => {
       ...prev,
       { type: 'peer_message', content: event.data },
     ]);
-    socket.emit("request_tts", event.data, roomName);
+    socket.emit('request_tts', event.data, roomName);
   };
 
   const handleSendMessage = message => {
@@ -272,28 +293,32 @@ const CallScreen = () => {
   };
 
   const handleNotificationHi = peerEmail => {
+    const currentTalkId = talkIdRef.current; // 최신 talkId 참조
     console.log(`${peerEmail} has joined the room.`);
-    alert(`${peerEmail} has joined the room.`);
-    console.log(talkId);
-    axios.post(
-      `${import.meta.env.VITE_API_BASE_URL}/api/v1/talk/peer`,
-      {
-        talkId: talkId,
-        receiverEmail: peerEmail
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-          Accept: 'application/json',
-        },
-      }
-    )
-    .then((response) => {
-      const imageUrl = response.data.profileImage === "default" ? DefaultProfile : response.data.profileImage;
-      setPeerNickname(response.data.nickname);
-      setPeerProfileImage(imageUrl);
-    });
+    console.log('Talk ID:', currentTalkId);
 
+    axios
+      .post(
+        `${import.meta.env.VITE_API_BASE_URL}/api/v1/talk/peer`,
+        {
+          talkId: currentTalkId, // useRef로 저장된 talkId 사용
+          receiverEmail: peerEmail,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
+            Accept: 'application/json',
+          },
+        }
+      )
+      .then(response => {
+        const imageUrl =
+          response.data.profileImage === 'default'
+            ? DefaultProfile
+            : response.data.profileImage;
+        setPeerNickname(response.data.nickname);
+        setPeerProfileImage(imageUrl);
+      });
   };
 
   const handleOffer = async offer => {
@@ -350,53 +375,58 @@ const CallScreen = () => {
     console.log('peer video Stream added:', stream);
 
     try {
-      const audioContext = new AudioContext();
-      await audioContext.audioWorklet.addModule('/js/audio-processor.js');
+      audioContext.current = new AudioContext();
+      await audioContext.current.audioWorklet.addModule(
+        '/js/audio-processor.js'
+      );
 
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = new AudioWorkletNode(audioContext, 'audio-processor');
+      const source = audioContext.current.createMediaStreamSource(stream);
+      audioProcessorNode.current = new AudioWorkletNode(
+        audioContext.current,
+        'audio-processor'
+      );
 
-      processor.port.onmessage = event => {
+      audioProcessorNode.current.port.onmessage = event => {
         const audioChunk = event.data;
-        // TODO : BUG
-        // 원래 chat으로 잘돌아갔었음
-        // 지금은 chat, voice 둘다 나오게 해야 뭐가 혼재되어서 나옴
-        // 뭔가 잘못된듯
         if (screenType.current === 'chat') {
           socket.emit('audio_chunk', audioChunk, roomName);
         }
       };
 
-      source.connect(processor);
+      source.connect(audioProcessorNode.current);
     } catch (error) {
       console.error('Error during AudioProcessor setup:', error);
     }
   };
 
-  const handleStopAudioChunk = roomName => {
-    console.log('Stop audio chunk transmission for room: ${roomName}');
+  const handleStopAudioChunk = async roomName => {
+    console.log(`Stop audio chunk transmission for room: ${roomName}`);
 
-    // AudioWorkletNode 연결 해제 및 종료
-    if (audioProcessorNode.current) {
+    if (audioProcessorNode?.current) {
       try {
-        audioProcessorNode.current.port.close();
+        await audioProcessorNode.current.port.close();
         audioProcessorNode.current.disconnect();
         console.log('AudioProcessorNode disconnected and closed.');
       } catch (error) {
         console.error('Error closing AudioProcessorNode:', error);
+      } finally {
+        audioProcessorNode.current = null;
       }
-      audioProcessorNode.current = null;
+    } else {
+      console.warn('audioProcessorNode is not defined or already cleared.');
     }
 
-    // AudioContext 종료
-    if (audioContext.current) {
+    if (audioContext?.current) {
       try {
-        audioContext.current.close();
+        await audioContext.current.close();
         console.log('AudioContext closed.');
       } catch (error) {
         console.error('Error closing AudioContext:', error);
+      } finally {
+        audioContext.current = null;
       }
-      audioContext.current = null;
+    } else {
+      console.warn('audioContext is not defined or already cleared.');
     }
   };
 
@@ -404,90 +434,105 @@ const CallScreen = () => {
     console.log('User disconnected: ${socket.id}');
 
     // 각 방에서 해당 소켓 ID 제거
-    // for (const roomName in rooms) {
-    //   const userIndex = rooms[roomName]?.findIndex(
-    //     user => user.id === socket.id
-    //   );
-    //   if (userIndex !== -1) {
-    //     const userEmail = rooms[roomName][userIndex].email;
-    //     rooms[roomName].splice(userIndex, 1);
-    //     console.log('[Room] ${userEmail} removed from room: ${roomName}');
+    for (const roomName in rooms) {
+      const userIndex = rooms[roomName]?.findIndex(
+        user => user.id === socket.id
+      );
+      if (userIndex !== -1) {
+        const userEmail = rooms[roomName][userIndex].email;
+        rooms[roomName].splice(userIndex, 1);
+        console.log('[Room] ${userEmail} removed from room: ${roomName}');
 
-    //     // 방에 남은 유저가 없으면 방 정리
-    //     const userCount =
-    //       wsServer.sockets.adapter.rooms.get(roomName)?.size || 0;
-    //     if (userCount === 0) {
-    //       console.log('[Room] Last user left. Cleaning up room: ${roomName}');
-    //       transcribeService.stopTranscribe(roomName); // AWS Transcribe 및 스트림 종료
-    //       roomManager.removeRoom(roomName);
-    //       delete rooms[roomName];
-    //     } else {
-    //       socket.to(roomName).emit('peer_left', userEmail);
-    //       console.log(`${userEmail} has left the room: ${roomName}`);
-    //     }
-    //     break; // 한 방만 찾으면 루프 종료
-    //   }
-    // }
+        // 방에 남은 유저가 없으면 방 정리
+        const userCount =
+          wsServer.sockets.adapter.rooms.get(roomName)?.size || 0;
+        if (userCount === 0) {
+          console.log('[Room] Last user left. Cleaning up room: ${roomName}');
+          transcribeService.stopTranscribe(roomName); // AWS Transcribe 및 스트림 종료
+          roomManager.removeRoom(roomName);
+          delete rooms[roomName];
+        } else {
+          socket.to(roomName).emit('peer_left', userEmail);
+          console.log(`${userEmail} has left the room: ${roomName}`);
+        }
+        break; // 한 방만 찾으면 루프 종료
+      }
+    }
   };
 
   const handleLeaveRoom = async () => {
-    console.log(`${userInfo.email} leaves room : ${roomName}`);
+    console.log(`${userInfo.email} leaves room: ${roomName}`);
 
-    if (socket && screenType.current === 'chat') {
-      console.log('Ending Transcribe session for room:', roomName);
-      socket.emit('stop_transcribe', roomName); // 서버에서 Transcribe 종료
+    try {
+      if (socket && screenType.current === 'chat') {
+        console.log('Requesting Transcribe termination for room:', roomName);
+        socket.emit('stop_transcribe', roomName); // 서버에서 Transcribe 종료 요청
+      }
+    } catch (error) {
+      console.error('Error while stopping Transcribe session:', error);
     }
 
-    // WebRTC 연결 종료
-    if (myPeerConnection.current) {
-      console.log('Closing peer connection...');
-      try {
+    try {
+      // WebRTC 연결 종료
+      if (myPeerConnection.current) {
+        console.log('Closing PeerConnection...');
         myPeerConnection.current.close();
         myPeerConnection.current = null;
-        console.log('PeerConnection closed and cleared.');
-      } catch (error) {
-        console.error('Error closing PeerConnection:', error);
+        console.log('PeerConnection closed successfully.');
       }
+    } catch (error) {
+      console.error('Error during PeerConnection closure:', error);
     }
 
-    // 스트림 정리
-    if (myStream.current && myStream.current instanceof MediaStream) {
-      console.log('Stopping media stream tracks...');
-      try {
+    try {
+      // 스트림 정리
+      if (myStream.current && myStream.current instanceof MediaStream) {
+        console.log('Stopping MediaStream tracks...');
         myStream.current.getTracks().forEach(track => track.stop());
-        console.log('Media stream tracks stopped.');
-      } catch (error) {
-        console.error('Error stopping media stream tracks:', error);
+        myStream.current = null;
+        console.log('MediaStream tracks stopped successfully.');
       }
-      myStream.current = null;
-      console.log('Media stream stopped and cleared.');
+    } catch (error) {
+      console.error('Error while stopping MediaStream tracks:', error);
     }
 
-    // 소켓에서 방 떠나는 이벤트 전송
-    if (socket) {
-      console.log('Sending leave_room event to server.');
-      socket.off('audio_chunk'); // audio_chunk 이벤트 중단
-      socket.emit('leave_room', {
-        roomName: roomName,
-        chatMessages: chatMessages, // 문자열화
-      });
+    try {
+      // 소켓 이벤트 정리 및 leave_room 이벤트 전송
+      if (socket) {
+        console.log('Sending leave_room event to server...');
+        socket.off('audio_chunk'); // audio_chunk 리스너 제거
+        socket.emit('leave_room', { roomName, chatMessages });
+        console.log('leave_room event sent successfully.');
+      }
+    } catch (error) {
+      console.error('Error while sending leave_room event:', error);
     }
 
-    navigate(`/call/end?roomName=${roomName}&talkId=${talkId}`);
+    try {
+      // UI 이동 보장
+      console.log('Navigating to /call/end...');
+      navigate(`/call/end?roomName=${roomName}&talkId=${talkId}`);
+      console.log('Navigation to /call/end completed.');
+    } catch (error) {
+      console.error('Error during navigation:', error);
+    }
   };
 
   const handleRoomFull = () => {
     alert('Room is already full!');
   };
 
-  const handlePeerLeft = peerEmail => {
-    alert(`${peerEmail} has left the room.`);
-    alert('press ok to end call.');
+  const handlePeerLeft = async peerEmail => {
+    console.log(`${peerEmail} has left the room.`);
+    alert('상대방이 통화를 종료했습니다. 종료 화면으로 이동합니다.');
+
+    // AudioChunk Listener 제거 및 AudioProcessor 정리
     if (screenType.current === 'chat') {
-      console.log('Stopping Audio Processor for peer leave...');
-      handleStopAudioChunk(roomName); // Audio Processor 정리
+      console.log('Stopping Audio Processor due to peer leave...');
+      await handleStopAudioChunk(roomName);
     }
-    handleLeaveRoom();
+
+    await handleLeaveRoom(); // 종료 로직 비동기 처리
   };
 
   // ChatBox에 Transcribe 결과를 표시하는 핸들러
@@ -506,10 +551,11 @@ const CallScreen = () => {
       {!isSelectionLocked ? (
         <CallSetting onConfirm={handleConfirm} />
       ) : screenType.current === 'voice' ? (
-        <CallVoiceScreen 
+        <CallVoiceScreen
           nickname={peerNickname}
-          profileImage={peerProfileImage} 
-          onEndCall={handleLeaveRoom} />
+          profileImage={peerProfileImage}
+          onEndCall={handleLeaveRoom}
+        />
       ) : (
         <CallChatScreen
           nickname={peerNickname}

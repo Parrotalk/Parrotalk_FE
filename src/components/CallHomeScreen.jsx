@@ -33,6 +33,8 @@ const CallHomeScreen = () => {
         email: data.email,
         profileImage: data.profileImage
       });
+      localStorage.setItem('userInfo', JSON.stringify(data));
+      
     } catch (error) {
       console.error('Error fetching user info:', error);
     }
@@ -103,38 +105,40 @@ const CallHomeScreen = () => {
   };
 
   return (
-    <div className="call-home-container">
-      <div className="profile-section">
-        <img src={userInfo.profileImage} alt="Default Profile" className="profile-picture" />
-        <div className="profile-info">
-          <span className="nickname">{userInfo.nickname || '익명'}</span>
-          <button
-            type="button"
-            className="create-room-button"
-            onClick={handleCreateRoom}
-          >
-            <img src={PhoneIcon} alt="Phone Icon" className="phone-icon" />
-            <span className="phone-text">{createButtonText}</span>
-          </button>
-        </div>
-      </div>
-
-      {roomLink && (
-        <div className="room-link-container">
-          <p className="room-link-title">통화 코드</p>
-          <div className="room-code">{roomLink.split('/').pop()}</div>
-          <div className="button-group">
-            <ShareButton roomLink={roomLink} className="custom-button" />
+    <div className='call-home-view'>
+      <div className="call-home-container">
+        <div className="profile-section">
+          <img src={userInfo.profileImage} alt="Default Profile" className="profile-picture" />
+          <div className="profile-info">
+            <span className="nickname">{userInfo.nickname || '익명'}</span>
             <button
               type="button"
-              className="join-room-button"
-              onClick={handleJoinRoom}
+              className="create-room-button"
+              onClick={handleCreateRoom}
             >
-              통화 시작
+              <img src={PhoneIcon} alt="Phone Icon" className="phone-icon" />
+              <span className="phone-text">{createButtonText}</span>
             </button>
           </div>
         </div>
-      )}
+
+        {roomLink && (
+          <div className="room-link-container">
+            <p className="room-link-title">통화 코드</p>
+            <div className="room-code">{roomLink.split('/').pop()}</div>
+            <div className="button-group">
+              <ShareButton roomLink={roomLink} className="custom-button" />
+              <button
+                type="button"
+                className="join-room-button"
+                onClick={handleJoinRoom}
+              >
+                통화 시작
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
