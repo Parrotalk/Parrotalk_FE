@@ -13,9 +13,24 @@ import { useRoomName } from '../hooks/useRoomName';
 import './CallScreen.css';
 import api from '../interceptors/LoginInterceptor'; 
 
+
 const CallScreen = () => {
   const { roomName: decodedRoomName } = useRoomName(useParams().roomName);
+  // const { talkId: }
   const roomName = decodedRoomName;
+ 
+  // const [ talkId, setTalkId ] = useState('');
+
+  const talkId = useRef('');
+  useEffect(() => {
+    const splitRoomName = roomName.split("?talkId=");
+    const mainRoomName = splitRoomName[0]; // "Mzk4OTZmZGMtYzYzNC00OQ=="
+    talkId.current = splitRoomName[1]; // "272"
+
+
+    console.log("[callscreen mainRoomName] :", mainRoomName);
+    console.log("[callscreen talkId] :", talkId.current);
+}, [roomName]);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -36,7 +51,6 @@ const CallScreen = () => {
     setPeerProfileImage,
   } = usePeer();
 
-  const { talkId } = location.state || {};
   const screenType = useRef(null);
   const [isSelectionLocked, setSelectionLocked] = useState(false);
 
@@ -327,21 +341,18 @@ const CallScreen = () => {
   };
 
   const handleNotificationHi = peerEmail => {
+    console.log("[callscreen notifiactionhi] ",talkId.current);
+    console.log("[callscreen notifiactionhi] ",peerEmail);
     api
       .post(
         '/api/v1/talk/peer',
         {
-          talkId: talkId, // useRef로 저장된 talkId 사용
+          talkId: talkId.current, // useRef로 저장된 talkId 사용
           receiverEmail: peerEmail,
         },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-            Accept: 'application/json',
-          },
-        }
       )
       .then(response => {
+        console.log("[callscreen notifiactionhi] ", response);
         const imageUrl =
           response.data.profileImage === 'default'
             ? DefaultProfile
@@ -535,7 +546,7 @@ const CallScreen = () => {
 
         navigate(`/call/end?roomName=${roomName}`, {
           state: { 
-            talkId: talkId || null, 
+            talkId: talkId.current || null, 
             chatMessages: chatMessages || [] 
           },
         });  

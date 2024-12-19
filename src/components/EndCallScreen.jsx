@@ -15,11 +15,24 @@ const EndCallScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const socket = useSocket();
-  const { peerNickname, peerProfileImage } = usePeer();
+  const { peerNickname, setPeerNickname, peerProfileImage, setPeerProfileImage } = usePeer();
 
   const searchParams = new URLSearchParams(location.search);
   const roomName = searchParams.get('roomName');
   const { talkId, chatMessages } = location.state || {};
+
+  useEffect(() => {
+    const handleLeavePage = () => {
+      console.log('EndCallScreen 페이지를 떠납니다.');
+      setPeerNickname(null);
+      setPeerProfileImage(null);
+    };
+  
+    return () => {
+      handleLeavePage(); // 컴포넌트를 떠날 때 실행
+    };
+  }, [roomName, socket]);
+  
 
   useEffect(() => {
     const checkLoginStatus = () => {

@@ -16,6 +16,7 @@ const CallHomeScreen = () => {
   const navigate = useNavigate();
   const socket = useSocket();
   const { userInfo, setUserInfo } = useUserInfo();
+  const [roomName, setRoomName] = useState('');
 
   const fetchUserInfo = accessToken => {
     try {
@@ -51,6 +52,7 @@ const CallHomeScreen = () => {
 
   const handleCreateRoom = () => {
     socket.emit('create_room', roomName => {
+      setRoomName(roomName);
       const encodedRoomName = encodeRoomName(roomName);
       const link = `${window.location.origin}/call/${encodedRoomName}`;
       setRoomLink(link);
@@ -62,7 +64,7 @@ const CallHomeScreen = () => {
   const handleJoinRoom = () => {
     if (roomLink) {
       const roomName = roomLink.split('/').pop();
-      const email = userInfo.email;
+      //const email = userInfo.email;
 
       try {
         api
@@ -80,8 +82,8 @@ const CallHomeScreen = () => {
           )
           .then(response => {
             console.log(response);
-            navigate(`/call/${roomName}`, {
-              state: { talkId: response.data },
+            navigate(`/call/${encodeRoomName(`${roomName}?talkId=${response.data}`)}`, {
+         
             });
           });
       } catch (error) {
